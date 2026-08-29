@@ -176,6 +176,8 @@ Sau khi reviewer quyết định, giao diện phải:
 - **Reject:** hủy action, không thực hiện.
 - **Edit:** cập nhật action theo nội dung reviewer sửa rồi thực hiện action đã sửa.
 
+Để tránh LangGraph tính lại conditional edge khi reviewer thay action, implementation có thể lưu action thay thế tạm thời trong một field riêng như `edited_action`. High-risk node áp dụng field này vào `proposed_action` sau khi resume; final state và audit vẫn phải chứa action đã sửa.
+
 Compiled graph cần được giữ trong `st.session_state` để không bị tạo lại ngoài ý muốn sau mỗi lần Streamlit rerun.
 
 ## 10. Audit trail

@@ -66,6 +66,7 @@ State bổ sung các trường cần cho demo hoàn chỉnh:
 - `total_operating_income: float`: TOI đầu vào, không âm.
 - `churn_probability: float`: xác suất churn trong `[0.0, 1.0]`.
 - `reviewer_id: str`: người đưa ra human decision.
+- `edited_action: str`: action thay thế đang chờ high-risk node áp dụng sau resume.
 - `execution_status: str`: kết quả mô phỏng (`executed`, `rejected` hoặc trạng thái mô tả tương đương).
 
 Năm trường của lab luôn tồn tại trong initial state. Các trường bổ sung giúp node không phụ thuộc vào biến toàn cục hoặc dữ liệu UI nằm ngoài checkpoint.
@@ -109,7 +110,7 @@ interrupt_before=["execute_high_risk_action"]
 
 Mỗi case dùng một `thread_id` UUID. Khi route high-risk, checkpoint chứa toàn bộ customer state và `snapshot.next` trỏ đến high-risk node nhưng node chưa chạy.
 
-Streamlit lưu compiled graph, config và thread ID trong `st.session_state`. Khi reviewer quyết định, UI gọi `update_state` với decision, reviewer và action đã sửa (nếu có), sau đó gọi `invoke(None, config)` để tiếp tục từ checkpoint.
+Streamlit lưu compiled graph, config và thread ID trong `st.session_state`. Khi reviewer quyết định, UI gọi `update_state` với decision, reviewer và `edited_action` (nếu có), sau đó gọi `invoke(None, config)` để tiếp tục từ checkpoint. Action sửa không ghi đè `proposed_action` tại breakpoint vì việc đó có thể khiến conditional edge được tính lại và bypass pending high-risk node.
 
 ## 8. Hành vi execution node
 
@@ -128,7 +129,7 @@ Việc ghi cả quyết định tự động tạo audit trail đầy đủ hơn
 
 - `approve`: giữ nguyên action, đặt trạng thái đã thực thi.
 - `reject`: không thực thi, đặt trạng thái bị từ chối.
-- `edit`: dùng `proposed_action` đã được UI cập nhật, rồi đặt trạng thái đã thực thi.
+- `edit`: high-risk node đọc `edited_action`, cập nhật `proposed_action`, rồi đặt trạng thái đã thực thi.
 
 Decision thiếu hoặc không hợp lệ gây lỗi rõ ràng thay vì âm thầm thực thi. Mỗi nhánh hợp lệ tạo đúng một audit entry.
 
