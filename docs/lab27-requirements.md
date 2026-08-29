@@ -213,3 +213,46 @@ Tài liệu bàn giao cuối cùng cần giải thích:
 1. Khi cần con người rewrite email sau lúc email được generate nhưng trước routing, nên dùng `interrupt_after` ở node generate hay `interrupt_before` ở node kế tiếp, và lý do lựa chọn.
 2. Cách giảm alert fatigue khi có khoảng 500 action `send_email` mỗi ngày với confidence quanh `0.82`, ngay dưới threshold `0.85`.
 3. Vì sao không nên tin hoàn toàn confidence tự báo của LLM và cách calibrate confidence trước routing.
+
+## 13. Yêu cầu nộp bài
+
+Bài làm là artefact cá nhân và được nộp bằng link repository GitHub cá nhân chứa toàn bộ Lab 27.
+
+Repository phải thể hiện tối thiểu:
+
+- `GraphState`
+- `AuditEntry`
+- `evaluate_customer`
+- `route_action`
+- `execute_low_risk_action`
+- `execute_high_risk_action`
+- `MemorySaver`
+- `interrupt_before`
+- Streamlit approval interface
+- Audit log
+
+README phải mô tả:
+
+- Cách cài dependency bằng `pip install -r requirements.txt`.
+- Cách chạy LangGraph workflow.
+- Cách chạy Streamlit UI bằng `streamlit run app.py`.
+- Confidence threshold đang sử dụng.
+- Hard policy rule.
+- Cách thực hiện Approve, Reject và Edit.
+- Vị trí lưu audit log.
+
+Repository không được chứa:
+
+- API key.
+- Access token.
+- Password.
+- Private key.
+- File `.env` có credential thật.
+
+Link nộp có dạng:
+
+```text
+https://github.com/<YOUR_USERNAME>/Day27-HITL
+```
+
+Việc push repository và dán link lên hệ thống nộp bài là thao tác riêng sau khi mã nguồn đã được kiểm tra và người dùng cho phép.

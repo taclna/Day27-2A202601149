@@ -208,3 +208,13 @@ Confidence tự báo của LLM không phải xác suất đã được hiệu ch
 - Deploy lên cloud.
 
 Các phần này chỉ nên bổ sung sau khi demo HITL cốt lõi đã được nghiệm thu.
+
+## 15. Artefact bàn giao và an toàn repository
+
+README của repository sẽ là hướng dẫn bàn giao chính, gồm lệnh cài dependency, lệnh chạy workflow CLI, lệnh chạy Streamlit, confidence threshold `0.85`, hard rule cho `increase_credit_limit`, quy trình Approve/Reject/Edit và vị trí `audit_log.json`.
+
+Project bổ sung một CLI demo nhỏ trong `graph.py` hoặc entry point tương đương để người chấm có thể chạy LangGraph workflow mà không cần mở Streamlit. CLI chỉ mô phỏng hành động và không gọi dịch vụ thật.
+
+`.gitignore` loại trừ `.env`, các biến thể environment cục bộ, private key, cache Python, virtual environment và artefact test. File `.env.example` không cần thiết vì ứng dụng không sử dụng credential. Trước khi bàn giao sẽ quét tên file và nội dung được track để phát hiện chuỗi credential phổ biến.
+
+Repository sau cùng phải chứa trực tiếp các artefact bắt buộc: `GraphState`, `AuditEntry`, hai function reasoning/routing, hai execution node, `MemorySaver`, cấu hình `interrupt_before`, giao diện Streamlit và audit log. Việc commit mã nguồn nằm trong phạm vi triển khai; push lên GitHub hoặc nộp link chỉ được thực hiện khi người dùng yêu cầu riêng.
