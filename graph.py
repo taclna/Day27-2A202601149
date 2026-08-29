@@ -2,12 +2,21 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TypedDict
+
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import END, StateGraph
+
+from audit import append_audit_entry, utc_timestamp
+from models import AuditEntry
 
 
 AUTO_EXECUTE_THRESHOLD = 0.85
 HIGH_RISK_ACTION = "increase_credit_limit"
 LOW_RISK_ACTION = "send_email"
+AGENT_ID = "churn-risk-agent"
+DEFAULT_AUDIT_PATH = Path("audit_log.json")
 
 
 class GraphState(TypedDict):
@@ -21,6 +30,7 @@ class GraphState(TypedDict):
     total_operating_income: float
     churn_probability: float
     reviewer_id: str
+    edited_action: str
     execution_status: str
 
 
@@ -54,6 +64,7 @@ def create_initial_state(
         total_operating_income=float(total_operating_income),
         churn_probability=float(churn_probability),
         reviewer_id="",
+        edited_action="",
         execution_status="pending_evaluation",
     )
 
@@ -105,3 +116,95 @@ def route_action(state: GraphState) -> str:
     if state["confidence_score"] >= AUTO_EXECUTE_THRESHOLD:
         return "execute_low_risk_action"
     return "execute_high_risk_action"
+
+
+def _write_audit(
+    state: GraphState,
+    reviewer_id: str,
+    decision: str,
+    audit_path: str | Path,
+    action: str | None = None,
+) -> None:
+    entry = AuditEntry(
+        timestamp=utc_timestamp(),
+        agent_id=AGENT_ID,
+        action=action or state["proposed_action"],
+        confidence=state["confidence_score"],
+        reviewer_id=reviewer_id,
+        decision=decision,
+    )
+    append_audit_entry(entry, audit_path)
+
+
+def execute_low_risk_action(
+    state: GraphState,
+    audit_path: str | Path = DEFAULT_AUDIT_PATH,
+) -> dict[str, str]:
+    """Simulate a safe action and record the automatic decision."""
+
+    _write_audit(state, "system", "auto_execute", audit_path)
+    return {"execution_status": f"executed:{state['proposed_action']}"}
+
+
+def execute_high_risk_action(
+    state: GraphState,
+    audit_path: str | Path = DEFAULT_AUDIT_PATH,
+) -> dict[str, str]:
+    """Apply a reviewed decision after the graph resumes from its interrupt."""
+
+    decision = (state["human_decision"] or "").strip().lower()
+    if decision not in {"approve", "reject", "edit"}:
+        raise ValueError("Human decision must be approve, reject, or edit")
+
+    reviewer_id = state["reviewer_id"].strip()
+    if not reviewer_id:
+        raise ValueError("Reviewer ID must not be empty")
+
+    action = state["proposed_action"]
+    updates: dict[str, str] = {}
+    if decision == "edit":
+        action = state["edited_action"].strip()
+        if not action:
+            raise ValueError("Edited action must not be empty")
+        updates["proposed_action"] = action
+
+    _write_audit(state, reviewer_id, decision, audit_path, action=action)
+    status_prefix = "rejected" if decision == "reject" else "executed"
+    updates["execution_status"] = f"{status_prefix}:{action}"
+    return updates
+
+
+def build_graph(
+    audit_path: str | Path = DEFAULT_AUDIT_PATH,
+    checkpointer=None,
+):
+    """Build the persistent LangGraph workflow with a high-risk breakpoint."""
+
+    builder = StateGraph(GraphState)
+    builder.add_node("evaluate_customer", evaluate_customer)
+
+    def low_risk_node(state: GraphState) -> dict[str, str]:
+        return execute_low_risk_action(state, audit_path)
+
+    def high_risk_node(state: GraphState) -> dict[str, str]:
+        return execute_high_risk_action(state, audit_path)
+
+    builder.add_node("execute_low_risk_action", low_risk_node)
+    builder.add_node("execute_high_risk_action", high_risk_node)
+    builder.set_entry_point("evaluate_customer")
+    builder.add_conditional_edges(
+        "evaluate_customer",
+        route_action,
+        {
+            "execute_low_risk_action": "execute_low_risk_action",
+            "execute_high_risk_action": "execute_high_risk_action",
+        },
+    )
+    builder.add_edge("execute_low_risk_action", END)
+    builder.add_edge("execute_high_risk_action", END)
+
+    memory = checkpointer if checkpointer is not None else MemorySaver()
+    return builder.compile(
+        checkpointer=memory,
+        interrupt_before=["execute_high_risk_action"],
+    )
